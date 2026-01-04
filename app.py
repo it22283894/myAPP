@@ -1,4 +1,4 @@
-import streamlit as st
+0import streamlit as st
 import pandas as pd
 from pyvis.network import Network
 import streamlit.components.v1 as components
@@ -41,7 +41,7 @@ apply_custom_style()
 # --- 2. NEO4J CONNECTION CLASS ---
 class FoodLensDB:
     def __init__(self, uri, user, password):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.driver = GraphDatabase.driver(neo4j://127.0.0.1:7687, auth=(neo4j, sakuni200211))
 
     def close(self):
         self.driver.close()
@@ -136,3 +136,4 @@ if analyze_clicked and ingredient_list:
     db.close()
 else:
     st.info("👈 Enter ingredients and specify their weights in the sidebar to begin analysis.")
+
