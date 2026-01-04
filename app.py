@@ -86,9 +86,14 @@ def apply_custom_style():
         transform: translateY(-2px);
         box-shadow: 0 8px 15px rgba(76, 205, 153, 0.4);
     }
-    .sidebar>header{
-    color:white !important;
-    }
+    /* Style the Sidebar Header (st.sidebar.header) */
+[data-testid="stSidebar"] h2 {
+    color: #0000FF !important; /* This is Pure Blue */
+    font-size: 1.5rem !important;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
     
     </style>
     """, unsafe_allow_html=True)
@@ -156,5 +161,6 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found. Please upload it to your GitHub repo.")
 else:
     st.info("👈 Enter ingredients in the sidebar and click 'Analyze' to begin.")
+
 
 
