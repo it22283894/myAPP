@@ -180,4 +180,5 @@ if analyze_clicked:
 else:
     # This info box also has black text now
 
-    st.info("👈 Enter ingredients in the sidebar (e.g., 'alcohol, peanuts') and click 'Analyze' to begin.")
+    st.info("👈 Enter ingredients in the sidebar (e.g., 'alcohol, sodium') and click 'Analyze' to begin.")
+
