@@ -76,6 +76,7 @@ def apply_custom_style():
         font-weight: bold;
         border: none;
         padding: 10px;
+        margin:20px;
         transition: all 0.3s ease;
     }
 
@@ -151,3 +152,4 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found. Please upload it to your GitHub repo.")
 else:
     st.info("👈 Enter ingredients in the sidebar and click 'Analyze' to begin.")
+
