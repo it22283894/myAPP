@@ -41,42 +41,38 @@ apply_custom_style()
 # --- 2. NEO4J CONNECTION CLASS ---
 class FoodLensDB:
     def __init__(self, uri, user, password):
-        try:
-            self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        except Exception as e:
-            st.error(f"Failed to connect to Neo4j: {e}")
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
         self.driver.close()
 
     def get_weighted_risks(self, ingredient_data):
-        """
-        Calculates risk scores based on ingredient presence and gram quantity.
-        """
         ingredients = list(ingredient_data.keys())
-        # Cypher Query: Finds diseases and aggregates weights based on user input
+        # Specify the database name here: foodlensNew
         query = """
         MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
         WHERE i.name IN $names
         RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
         """
-        with self.driver.session() as session:
+        with self.driver.session(database="foodlensnew") as session:
             result = session.run(query, names=ingredients)
             records = result.data()
             
-            # Post-processing to factor in grams (The "Quantitative" logic)
             processed_data = []
             for rec in records:
                 grams = ingredient_data.get(rec['ingredient'], 0)
-                # Logic: Higher grams increase the risk score
+                # Apply the quantitative logic from your proposal
+                # Score = (Scientific Weight) * (Dosage/Grams)
                 calculated_score = rec['base_weight'] * (grams / 100.0) 
-                processed_data.append({
-                    "ingredient": rec['ingredient'],
-                    "disease": rec['disease'],
-                    "score": round(calculated_score, 2)
-                })
+                
+                # THRESHOLD: Only keep results with a significant score to avoid "10+ diseases"
+                if calculated_score > 0.4: 
+                    processed_data.append({
+                        "ingredient": rec['ingredient'],
+                        "disease": rec['disease'],
+                        "score": round(calculated_score, 2)
+                    })
             return pd.DataFrame(processed_data)
-
 # --- 3. SIDEBAR INPUTS ---
 st.sidebar.image("OIP.jpg", width=800)
 st.sidebar.header("Input Food Label")
