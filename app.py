@@ -39,42 +39,47 @@ def apply_custom_style():
 apply_custom_style()
 
 # --- 2. NEO4J CONNECTION CLASS ---
+# --- 2. DATABASE CLASS ---
 class FoodLensDB:
     def __init__(self, uri, user, password):
-        try:
-            self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        except Exception as e:
-            st.error(f"Failed to connect to Neo4j: {e}")
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
         self.driver.close()
 
+    # ADD THE FUNCTION RIGHT HERE
     def get_weighted_risks(self, ingredient_data):
-        """
-        Calculates risk scores based on ingredient presence and gram quantity.
-        """
         ingredients = list(ingredient_data.keys())
-        # Cypher Query: Finds diseases and aggregates weights based on user input
+        
+        # We add 'ORDER BY base_weight DESC' to get the most important ones first
         query = """
         MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
         WHERE i.name IN $names
         RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
+        ORDER BY r.weight DESC
         """
-        with self.driver.session() as session:
+        
+        with self.driver.session(database="foodlensnew") as session:
             result = session.run(query, names=ingredients)
             records = result.data()
             
-            # Post-processing to factor in grams (The "Quantitative" logic)
             processed_data = []
             for rec in records:
+                # Use the grams from your sidebar input
                 grams = ingredient_data.get(rec['ingredient'], 0)
-                # Logic: Higher grams increase the risk score
+                
+                # Logic: Score = Scientific Weight * (Grams / 100)
+                # This ensures small amounts don't trigger "Disease Predictions"
                 calculated_score = rec['base_weight'] * (grams / 100.0) 
-                processed_data.append({
-                    "ingredient": rec['ingredient'],
-                    "disease": rec['disease'],
-                    "score": round(calculated_score, 2)
-                })
+                
+                # ONLY ADD TO LIST IF THE SCORE IS HIGH (Fixes the "10+ disease" issue)
+                if calculated_score > 0.5: 
+                    processed_data.append({
+                        "ingredient": rec['ingredient'],
+                        "disease": rec['disease'],
+                        "score": round(calculated_score, 2)
+                    })
+            
             return pd.DataFrame(processed_data)
 
 # --- 3. SIDEBAR INPUTS ---
@@ -102,3 +107,4 @@ if analyze_clicked and ingredient_list:
     db = FoodLensDB("bolt://localhost:7687", "neo4j", "password123")
     
     df_results
+
