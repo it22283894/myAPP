@@ -1,9 +1,9 @@
-0import streamlit as st
+import streamlit as st
 import pandas as pd
+import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import os
-from neo4j import GraphDatabase
 
 # --- 1. PAGE CONFIG & THEME ---
 st.set_page_config(
@@ -15,164 +15,139 @@ st.set_page_config(
 def apply_custom_style():
     st.markdown("""
     <style>
+    /* Hide Deploy Button and Streamlit Branding */
+    header {visibility: hidden;}
+    .stAppDeployButton {display:none;}
+    footer {visibility: hidden;}
+
+    /* Professional Dark Background */
     .stApp {
-        background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.85)), 
-                    url('https://images.pexels.com/photos/1565982/pexels-photo-1565982.jpeg?cs=srgb&dl=bread-color-copyspace-1565982.jpg&fm=jpg');
-        background-size: cover; background-position: center; background-attachment: fixed;
+        background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.75)), 
+                    url('https://images.pexels.com/photos/1565982/pexels-photo-1565982.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
     }
-    .stAlert { background-color: rgba(248, 250, 252, 0.9) !important; border-radius: 12px; }
-    .stAlert p { color: #000000 !important; font-weight: 600; }
-    [data-testid="stSidebar"] { background: rgba(255, 255, 255, 0.6) !important; backdrop-filter: blur(12px); }
+
+    /* Sidebar Styling & Header Color */
+    [data-testid="stSidebar"] {
+        background: rgba(255, 255, 255, 0.6) !important;
+        backdrop-filter: blur(12px);
+    }
+    
+    /* Sidebar Header - Mint Green */
+    [data-testid="stSidebar"] h2 {
+        color: #4CCD99 !important;
+        font-weight: 800 !important;
+        text-transform: uppercase;
+    }
+
+    /* Info Box (st.info) font color to BLACK */
+    .stAlert p {
+        color: #000000 !important;
+        font-weight: 600;
+    }
+
+    /* Global Header Styling */
+    h1, h2, h4 { color: white !important; font-weight: 800 !important; }
+    
+    /* Subheader (h3) - Mint Green */
+    h3 { color: #4CCD99 !important; font-weight: 700 !important; }
+                
+    /* Risk Cards with BLACK Font */
     .risk-card {
-        background: #8CE4FF; border-left: 8px solid #e63946; padding: 1.2rem;
-        border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-        margin-bottom: 12px; color: #000000 !important; font-weight: bold;
-        text-transform: uppercase; font-size: 0.85rem;
+        background: #8CE4FF; 
+        border-left: 8px solid #e63946;
+        padding: 1.2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        margin-bottom: 12px;
+        color: #000000 !important; 
+        font-weight: bold;
+        text-transform: uppercase;
     }
-    h1,h3,h4 { color: white !important; font-weight: 800 !important; }
-    h2 { color:#4CCD99 !important ; }
-    .stButton>button { width: 100%; border-radius: 15px; background-color: #004e92; color: white; font-weight: bold; }
-    [data-testid="stSidebar"] h2 { color: black !important; font-size: 1.5rem !important; text-transform: uppercase; }
+
+    /* Button with Hover Effect */
+    .stButton>button {
+        width: 100%;
+        border-radius: 20px;
+        background-color: #004e92;
+        color: white;
+        font-weight: bold;
+        border: none;
+        padding: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .stButton>button:hover {
+        background-color: #4CCD99 !important;
+        color: #000000 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(76, 205, 153, 0.4);
+    }
     </style>
     """, unsafe_allow_html=True)
 
 apply_custom_style()
 
-# --- 2. NEO4J CONNECTION CLASS ---
-class FoodLensDB:
-    def __init__(self, uri, user, password):
-        self.driver = GraphDatabase.driver(neo4j://127.0.0.1:7687, auth=(neo4j, sakuni200211))
+# --- 2. DATA LOADING ---
+@st.cache_data
+def load_data():
+    if not os.path.exists('pubmed_triplets.csv'):
+        return None
+    try:
+        # Use simple read_csv for Cloud compatibility
+        df = pd.read_csv('pubmed_triplets.csv', on_bad_lines='skip')
+        df.columns = [c.lower().strip() for c in df.columns]
+        return df
+    except:
+        return None
 
-    def close(self):
-        self.driver.close()
+df_triplets = load_data()
 
-    def get_weighted_risks(self, ingredient_data):
-        ingredients = list(ingredient_data.keys())
-        # Specify the database name here: foodlensNew
-        query = """
-        MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
-        WHERE i.name IN $names
-        RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
-        """
-        with self.driver.session(database="foodlensnew") as session:
-            result = session.run(query, names=ingredients)
-            records = result.data()
-            
-            processed_data = []
-            for rec in records:
-                grams = ingredient_data.get(rec['ingredient'], 0)
-                # Apply the quantitative logic from your proposal
-                # Score = (Scientific Weight) * (Dosage/Grams)
-                calculated_score = rec['base_weight'] * (grams / 100.0) 
-                
-                # THRESHOLD: Only keep results with a significant score to avoid "10+ diseases"
-                if calculated_score > 0.4: 
-                    processed_data.append({
-                        "ingredient": rec['ingredient'],
-                        "disease": rec['disease'],
-                        "score": round(calculated_score, 2)
-                    })
-            return pd.DataFrame(processed_data)
-
-def get_weighted_risks(self, ingredient_data):
-        ingredients = list(ingredient_data.keys())
-        
-        # Use a more specific query that expects a 'weight' on the relationship
-        query = """
-        MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
-        WHERE i.name IN $names
-        RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
-        """
-        
-        with self.driver.session(database="foodlensNew") as session:
-            result = session.run(query, names=ingredients)
-            records = result.data()
-            
-            processed_data = []
-            for rec in records:
-                # 1. Get the grams the user entered
-                grams = ingredient_data.get(rec['ingredient'], 0)
-                
-                # 2. RESEARCH LOGIC: Higher grams = Higher risk activation
-                # We normalize by 100g. If they eat 200g, risk doubles. If 1g, risk vanishes.
-                calculated_score = rec['base_weight'] * (grams / 100.0) 
-                
-                # 3. THRESHOLDING: This is the "GNN" filter. 
-                # If the score is too low, we don't show the disease at all.
-                if calculated_score > 0.5: 
-                    processed_data.append({
-                        "ingredient": rec['ingredient'],
-                        "disease": rec['disease'],
-                        "score": round(calculated_score, 2)
-                    })
-            
-            # Convert to DataFrame and sort by the highest score
-            df = pd.DataFrame(processed_data)
-            if not df.empty:
-                return df.sort_values(by='score', ascending=False)
-            return df
-# --- 3. SIDEBAR INPUTS ---
-st.sidebar.image("OIP.jpg", width=800)
+# --- 3. SIDEBAR ---
+# FIXED: Using a reliable URL to avoid MediaFileStorageError
+st.sidebar.image("https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=400", use_container_width=True)
 st.sidebar.header("Input Food Label")
-input_raw = st.sidebar.text_area("Enter Ingredients (Comma Separated)", placeholder="sugar, salt, alcohol", height=100)
-
-# Parsing ingredients to create dynamic gram inputs
-ingredient_list = [i.strip().lower() for i in input_raw.split(',') if i.strip()]
-gram_map = {}
-
-if ingredient_list:
-    st.sidebar.markdown("### Specify Quantities (Grams)")
-    for ing in ingredient_list:
-        gram_map[ing] = st.sidebar.number_input(f"Grams of {ing}", min_value=0.0, value=10.0, step=1.0)
-
+input_raw = st.sidebar.text_area("Enter Ingredients", placeholder="e.g., alcohol, sodium", height=150)
 analyze_clicked = st.sidebar.button("Analyze & Explain")
 
 # --- 4. MAIN CONTENT ---
-st.markdown("## FoodLens: AI-Powered Health Risk Predictor 🤓")
+st.markdown("### FoodLens: Best way to find health effects with your foods 🤓")
+st.markdown("#### Evidence-Based Research & Ingredient Safety")
 st.divider()
 
-if analyze_clicked and ingredient_list:
-    # Initialize Neo4j (Replace with your actual credentials)
-    db = FoodLensDB("bolt://localhost:7687", "neo4j", "password123")
-    
-    df_results = db.get_weighted_risks(gram_map)
+if analyze_clicked:
+    if df_triplets is not None:
+        input_ing = [i.strip().lower() for i in input_raw.split(',') if i.strip()]
+        # Filtering logic
+        relevant = df_triplets[df_triplets['ingredient'].str.lower().isin(input_ing)]
 
-    if not df_results.empty:
-        # Filtering logic: Only show risks with high probability (GNN-style threshold)
-        top_risks = df_results.groupby('disease')['score'].sum().sort_values(ascending=False)
-        top_risks = top_risks[top_risks > 0.5] # Threshold to reduce noise
+        if not relevant.empty:
+            col1, col2 = st.columns([1, 1.5])
+            with col1:
+                st.subheader("⚠️ Health Risk Predictions")
+                unique_diseases = relevant['disease'].unique()
+                for d in unique_diseases:
+                    st.markdown(f'<div class="risk-card">{d}</div>', unsafe_allow_html=True)
+                st.info(f"Analyzed {len(input_ing)} ingredients.")
 
-        col1, col2 = st.columns([1, 1.5])
-        
-        with col1:
-            st.subheader("⚠️ High Likelihood Risks")
-            if top_risks.empty:
-                st.write("No high-probability risks found for these quantities.")
-            for disease, score in top_risks.items():
-                st.markdown(f'<div class="risk-card">{disease} (Score: {score})</div>', unsafe_allow_html=True)
-            
-            st.info(f"Analyzed {len(ingredient_list)} ingredients. Used quantitative weighting for results.")
-
-        with col2:
-            st.subheader("🕸️ Predictive Knowledge Graph")
-            nt = Network(height='450px', width='100%', bgcolor="#ffffff", font_color='#101820')
-            nt.force_atlas_2based()
-            
-            for _, row in df_results.iterrows():
-                nt.add_node(row['ingredient'].title(), label=row['ingredient'].title(), color='#004e92', size=25)
-                nt.add_node(row['disease'].title(), label=row['disease'].title(), color='#e63946', size=20)
-                nt.add_edge(row['ingredient'].title(), row['disease'].title(), width=row['score']*5, color='#94a3b8')
-            
-            nt.save_graph('kg_graph.html')
-            components.html(open('kg_graph.html', 'r').read(), height=470)
-
-        st.subheader("🔍 Probability Data Breakdown")
-        st.dataframe(df_results, use_container_width=True)
+            with col2:
+                st.subheader("🕸️ Interactive Knowledge Graph")
+                nt = Network(height='450px', width='100%', bgcolor="#ffffff", font_color='#101820')
+                nt.force_atlas_2based() 
+                for _, row in relevant.iterrows():
+                    i_node = str(row['ingredient']).title()
+                    d_node = str(row['disease']).title()
+                    nt.add_node(i_node, label=i_node, color='#004e92', size=25)
+                    nt.add_node(d_node, label=d_node, color='#e63946', size=20)
+                    nt.add_edge(i_node, d_node, color='#94a3b8')
+                
+                nt.save_graph('kg_graph.html')
+                components.html(open('kg_graph.html', 'r').read(), height=470)
+        else:
+            st.warning("No risks found in our database for these ingredients.")
     else:
-        st.warning("No health connections found in the Knowledge Graph for these ingredients.")
-    
-    db.close()
+        st.error("Dataset 'pubmed_triplets.csv' not found. Please upload it to your GitHub repo.")
 else:
-    st.info("👈 Enter ingredients and specify their weights in the sidebar to begin analysis.")
-
-
+    st.info("👈 Enter ingredients in the sidebar and click 'Analyze' to begin.")
