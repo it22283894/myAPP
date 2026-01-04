@@ -152,7 +152,7 @@ if analyze_clicked:
                         #help="Click to view the scientific paper",
                         #validate=r"^https://",
                         #display_text="View Research 📄"
-                    ),
+                    #),
                     "ingredient": "Ingredient",
                     "disease": "Predicted Impact"
                 },
@@ -168,6 +168,7 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found.")
 else:
     st.info("👈 Enter ingredients in the sidebar and specify their weights to begin.")
+
 
 
 
