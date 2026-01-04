@@ -12,7 +12,22 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+def apply_custom_style():
+    st.markdown("""
+    <style>
+    /* Change visibility from 'hidden' to 'visible' for the header 
+       to ensure the sidebar toggle button can be seen */
+    header {visibility: visible !important;} 
 
+    /* Force the sidebar toggle button to be black/dark so it shows 
+       on your light glassmorphism sidebar */
+    .st-emotion-cache-6q9sum, .st-emotion-cache-1wbqy5l {
+        color: #000000 !important;
+    }
+    
+    /* Rest of your background and card CSS... */
+    </style>
+    """, unsafe_allow_html=True)
 def apply_custom_style():
     st.markdown("""
     <style>
@@ -162,6 +177,7 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found. Please upload it to your GitHub repo.")
 else:
     st.info("👈 Enter ingredients in the sidebar and click 'Analyze' to begin.")
+
 
 
 
