@@ -147,10 +147,10 @@ if analyze_clicked:
             st.dataframe(
                 display_df,
                 column_config={
-                    url_column: st.column_config.LinkColumn(
-                        "PubMed Source",
-                        help="Click to view the scientific paper",
-                        validate=r"^https://",
+                    #url_column: st.column_config.LinkColumn(
+                        #"PubMed Source",
+                        #help="Click to view the scientific paper",
+                        #validate=r"^https://",
                         #display_text="View Research 📄"
                     ),
                     "ingredient": "Ingredient",
@@ -168,5 +168,6 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found.")
 else:
     st.info("👈 Enter ingredients in the sidebar and specify their weights to begin.")
+
 
 
