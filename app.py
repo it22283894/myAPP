@@ -2,109 +2,106 @@ import streamlit as st
 import pandas as pd
 from pyvis.network import Network
 import streamlit.components.v1 as components
-import os
 from neo4j import GraphDatabase
 
 # --- 1. PAGE CONFIG & THEME ---
-st.set_page_config(
-    page_title="FoodLens | Health Effects Finder", 
-    page_icon="🥗", 
-    layout="wide"
-)
+st.set_page_config(page_title="FoodLens | Health Predictor", layout="wide")
 
-def apply_custom_style():
-    st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.85)), 
-                    url('https://images.pexels.com/photos/1565982/pexels-photo-1565982.jpeg?cs=srgb&dl=bread-color-copyspace-1565982.jpg&fm=jpg');
-        background-size: cover; background-position: center; background-attachment: fixed;
-    }
-    .stAlert { background-color: rgba(248, 250, 252, 0.9) !important; border-radius: 12px; }
-    .stAlert p { color: #000000 !important; font-weight: 600; }
-    [data-testid="stSidebar"] { background: rgba(255, 255, 255, 0.6) !important; backdrop-filter: blur(12px); }
-    .risk-card {
-        background: #8CE4FF; border-left: 8px solid #e63946; padding: 1.2rem;
-        border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-        margin-bottom: 12px; color: #000000 !important; font-weight: bold;
-        text-transform: uppercase; font-size: 0.85rem;
-    }
-    h1,h3,h4 { color: white !important; font-weight: 800 !important; }
-    h2 { color:#4CCD99 !important ; }
-    .stButton>button { width: 100%; border-radius: 15px; background-color: #004e92; color: white; font-weight: bold; }
-    [data-testid="stSidebar"] h2 { color: black !important; font-size: 1.5rem !important; text-transform: uppercase; }
-    </style>
-    """, unsafe_allow_html=True)
-
-apply_custom_style()
-
-# --- 2. NEO4J CONNECTION CLASS ---
 # --- 2. DATABASE CLASS ---
 class FoodLensDB:
     def __init__(self, uri, user, password):
+        # Using a context manager for the driver is safer
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
         self.driver.close()
 
-    # ADD THE FUNCTION RIGHT HERE
     def get_weighted_risks(self, ingredient_data):
         ingredients = list(ingredient_data.keys())
-        
-        # We add 'ORDER BY base_weight DESC' to get the most important ones first
+        # The Cypher query looks for connections in your specific DB
         query = """
         MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
         WHERE i.name IN $names
         RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
-        ORDER BY r.weight DESC
         """
-        
-        with self.driver.session(database="foodlensnew") as session:
+        # We specify your database name "foodlensNew" here
+        with self.driver.session(database="foodlensNew") as session:
             result = session.run(query, names=ingredients)
             records = result.data()
             
             processed_data = []
             for rec in records:
-                # Use the grams from your sidebar input
                 grams = ingredient_data.get(rec['ingredient'], 0)
-                
-                # Logic: Score = Scientific Weight * (Grams / 100)
-                # This ensures small amounts don't trigger "Disease Predictions"
+                # Apply your research logic: Score based on quantity
                 calculated_score = rec['base_weight'] * (grams / 100.0) 
                 
-                # ONLY ADD TO LIST IF THE SCORE IS HIGH (Fixes the "10+ disease" issue)
-                if calculated_score > 0.5: 
+                # Threshold to filter out the "10+ diseases" problem
+                if calculated_score > 0.4: 
                     processed_data.append({
                         "ingredient": rec['ingredient'],
                         "disease": rec['disease'],
                         "score": round(calculated_score, 2)
                     })
-            
             return pd.DataFrame(processed_data)
 
-# --- 3. SIDEBAR INPUTS ---
-st.sidebar.image("OIP.jpg", width=800)
+# --- 3. SIDEBAR ---
 st.sidebar.header("Input Food Label")
-input_raw = st.sidebar.text_area("Enter Ingredients (Comma Separated)", placeholder="sugar, salt, alcohol", height=100)
-
-# Parsing ingredients to create dynamic gram inputs
+input_raw = st.sidebar.text_area("Enter Ingredients (comma separated)", "sugar, salt")
 ingredient_list = [i.strip().lower() for i in input_raw.split(',') if i.strip()]
+
+# Grams input (Quantitative requirement from your proposal)
 gram_map = {}
-
 if ingredient_list:
-    st.sidebar.markdown("### Specify Quantities (Grams)")
     for ing in ingredient_list:
-        gram_map[ing] = st.sidebar.number_input(f"Grams of {ing}", min_value=0.0, value=10.0, step=1.0)
+        gram_map[ing] = st.sidebar.number_input(f"Grams of {ing}", min_value=0.0, value=20.0)
 
-analyze_clicked = st.sidebar.button("Analyze & Explain")
+analyze_clicked = st.sidebar.button("Analyze & Predict")
 
 # --- 4. MAIN CONTENT ---
-st.markdown("## FoodLens: AI-Powered Health Risk Predictor 🤓")
-st.divider()
+st.title("FoodLens: AI Health Impact Analysis")
 
-if analyze_clicked and ingredient_list:
-    # Initialize Neo4j (Replace with your actual credentials)
-    db = FoodLensDB("bolt://localhost:7687", "neo4j", "password123")
-    
-    df_results
+if analyze_clicked:
+    if not ingredient_list:
+        st.warning("Please enter at least one ingredient.")
+    else:
+        # 1. Initialize DB Connection
+        # Replace 'your_password' with your actual Neo4j password
+        db = FoodLensDB("bolt://localhost:7687", "neo4j", "your_password")
+        
+        try:
+            # 2. Fetch Data (This creates df_results)
+            df_results = db.get_weighted_risks(gram_map)
 
+            if not df_results.empty:
+                col1, col2 = st.columns([1, 1.5])
+                
+                with col1:
+                    st.subheader("⚠️ High Probability Risks")
+                    # Grouping helps show "Likely to happen" diseases first
+                    summary = df_results.groupby('disease')['score'].sum().sort_values(ascending=False)
+                    for disease, score in summary.items():
+                        st.markdown(f"**{disease.upper()}** (Risk Score: {score})")
+
+                with col2:
+                    st.subheader("Interactive Knowledge Graph")
+                    nt = Network(height='450px', width='100%', bgcolor="#ffffff", font_color='black')
+                    for _, row in df_results.iterrows():
+                        nt.add_node(row['ingredient'], label=row['ingredient'], color='#004e92')
+                        nt.add_node(row['disease'], label=row['disease'], color='#e63946')
+                        nt.add_edge(row['ingredient'], row['disease'], value=row['score'])
+                    
+                    nt.save_graph('kg_graph.html')
+                    components.html(open('kg_graph.html', 'r').read(), height=470)
+                
+                st.write("### Research Data Source")
+                st.dataframe(df_results)
+            else:
+                st.info("No significant health risks found for these ingredient quantities.")
+        
+        except Exception as e:
+            st.error(f"Error connecting to Neo4j: {e}")
+        
+        finally:
+            db.close()
+else:
+    st.info("👈 Enter ingredients and grams in the sidebar to run the GNN prediction.")
