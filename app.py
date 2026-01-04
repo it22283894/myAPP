@@ -144,6 +144,21 @@ if analyze_clicked:
             # Assumes your CSV has a column named 'url' or 'pubmed_url'
             # If your column is named differently, change 'url' below to your column name
             url_column = 'url' if 'url' in display_df.columns else display_df.columns[-1] 
+            st.dataframe(
+                display_df,
+                column_config={
+                    url_column: st.column_config.LinkColumn(
+                        "PubMed Source",
+                        help="Click to view the scientific paper",
+                        validate=r"^https://",
+                        display_text="View Research 📄"
+                    ),
+                    "ingredient": "Ingredient",
+                    "disease": "Predicted Impact"
+                },
+                hide_index=True,
+                use_container_width=True
+            )
 
             
 
