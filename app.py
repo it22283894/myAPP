@@ -73,6 +73,44 @@ class FoodLensDB:
                         "score": round(calculated_score, 2)
                     })
             return pd.DataFrame(processed_data)
+
+def get_weighted_risks(self, ingredient_data):
+        ingredients = list(ingredient_data.keys())
+        
+        # Use a more specific query that expects a 'weight' on the relationship
+        query = """
+        MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
+        WHERE i.name IN $names
+        RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
+        """
+        
+        with self.driver.session(database="foodlensNew") as session:
+            result = session.run(query, names=ingredients)
+            records = result.data()
+            
+            processed_data = []
+            for rec in records:
+                # 1. Get the grams the user entered
+                grams = ingredient_data.get(rec['ingredient'], 0)
+                
+                # 2. RESEARCH LOGIC: Higher grams = Higher risk activation
+                # We normalize by 100g. If they eat 200g, risk doubles. If 1g, risk vanishes.
+                calculated_score = rec['base_weight'] * (grams / 100.0) 
+                
+                # 3. THRESHOLDING: This is the "GNN" filter. 
+                # If the score is too low, we don't show the disease at all.
+                if calculated_score > 0.5: 
+                    processed_data.append({
+                        "ingredient": rec['ingredient'],
+                        "disease": rec['disease'],
+                        "score": round(calculated_score, 2)
+                    })
+            
+            # Convert to DataFrame and sort by the highest score
+            df = pd.DataFrame(processed_data)
+            if not df.empty:
+                return df.sort_values(by='score', ascending=False)
+            return df
 # --- 3. SIDEBAR INPUTS ---
 st.sidebar.image("OIP.jpg", width=800)
 st.sidebar.header("Input Food Label")
@@ -136,4 +174,5 @@ if analyze_clicked and ingredient_list:
     db.close()
 else:
     st.info("👈 Enter ingredients and specify their weights in the sidebar to begin analysis.")
+
 
