@@ -10,6 +10,7 @@ st.set_page_config(
     page_title="FoodLens | Health Effects Finder", 
     page_icon="🥗", 
     layout="wide"
+    initial_sidebar_state="expanded"
 )
 
 def apply_custom_style():
@@ -161,6 +162,7 @@ if analyze_clicked:
         st.error("Dataset 'pubmed_triplets.csv' not found. Please upload it to your GitHub repo.")
 else:
     st.info("👈 Enter ingredients in the sidebar and click 'Analyze' to begin.")
+
 
 
 
