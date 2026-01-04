@@ -11,11 +11,10 @@ class FoodLensDB:
         with self.driver.session() as session:
             # Cypher query to find diseases linked to multiple ingredients
             query = """
-            MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
-            WHERE i.name IN $ingredients
-            RETURN d.name AS disease, 
-                   sum(r.weight) AS risk_score, 
-                   collect(i.name) AS contributing_ingredients
-            ORDER BY risk_score DESC
-            """
+    MATCH (i:Ingredient)-[r:AFFECTS]->(d:Disease)
+    WHERE i.name IN $names
+    WITH i, d, r
+    WHERE r.weight > 0.5  // FILTER: Only show strong scientific evidence
+    RETURN i.name as ingredient, d.name as disease, r.weight as base_weight
+    """
             return session.run(query, ingredients=ingredients).data()
