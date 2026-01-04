@@ -136,7 +136,7 @@ def load_data():
 df_triplets = load_data()
 
 # --- 3. SIDEBAR ---
-st.sidebar.image("OIP.jpg", width=800)
+st.sidebar.image("https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=400", width=800)
 st.sidebar.header("Input Food Label")
 input_raw = st.sidebar.text_area("Enter Ingredients", placeholder="e.g., alcohol, sugar", height=150)
 analyze_clicked = st.sidebar.button("Analyze & Explain")
@@ -179,4 +179,5 @@ if analyze_clicked:
         st.error("Database file (pubmed_triplets.csv) not found.")
 else:
     # This info box also has black text now
+
     st.info("👈 Enter ingredients in the sidebar (e.g., 'alcohol, peanuts') and click 'Analyze' to begin.")
