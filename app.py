@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 URI = "neo4j+s://629b40da.databases.neo4j.io" 
 USER = "neo4j"
 PASSWORD = "aqNhn1oXDnvjN2HoCrCDkyIyBJhHhSG6o1naLQ--VT8"
-DB_NAME = "neo4j" 
+DB_NAME = "foodlensnew" 
 
 # --- 2. NEO4J CONNECTION CLASS ---
 class FoodLensGraph:
@@ -102,3 +102,4 @@ if analyze_clicked and input_ing:
         st.error(f"Failed to connect to Neo4j. Error: {e}")
 else:
     st.info("👈 Enter ingredients in the sidebar to begin.")
+
