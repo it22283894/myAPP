@@ -4,7 +4,7 @@ import pandas as pd
 
 # --- CONNECTION DETAILS ---
 # These should ideally go into .streamlit/secrets.toml
-URI = "https://629b40da.databases.neo4j.io/db/neo4j/query/v2" 
+URI = "neo4j+s://629b40da.databases.neo4j.io" 
 USER = "neo4j"
 PASSWORD = "aqNhn1oXDnvjN2HoCrCDkyIyBJhHhSG6o1naLQ--VT8"
 DB_NAME = "foodlensnew" # <--- This specifies your target database
@@ -59,6 +59,7 @@ with tab2:
                 st.success(f"Added {name} to {DB_NAME}!")
             else:
                 st.error("Please provide a name.")
+
 
 
 
